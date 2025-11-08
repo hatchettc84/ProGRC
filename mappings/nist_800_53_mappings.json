@@ -1,0 +1,296 @@
+{
+  "control_families": {
+    "AC": {
+      "name": "Access Control",
+      "controls": {
+        "AC-2": {
+          "title": "Account Management",
+          "requirements": [
+            "AC-2(1): Automated System Account Management",
+            "AC-2(2): Removal of Temporary Accounts",
+            "AC-2(3): Disable Inactive Accounts",
+            "AC-2(4): Automated Audit Actions"
+          ]
+        },
+        "AC-3": {
+          "title": "Access Enforcement",
+          "requirements": [
+            "AC-3(1): Access Enforcement",
+            "AC-3(2): Dual Authorization"
+          ]
+        },
+        "AC-6": {
+          "title": "Least Privilege",
+          "requirements": [
+            "AC-6(1): Authorize Access to Security Functions",
+            "AC-6(2): Non-Privileged Access for Nonsecurity Functions",
+            "AC-6(5): Privileged Accounts"
+          ]
+        }
+      }
+    },
+    "AU": {
+      "name": "Audit and Accountability",
+      "controls": {
+        "AU-2": {
+          "title": "Event Logging",
+          "requirements": [
+            "AU-2(a): Auditable Events",
+            "AU-2(b): Coordinated Audit"
+          ]
+        },
+        "AU-3": {
+          "title": "Content of Audit Records",
+          "requirements": [
+            "AU-3(1): Additional Audit Information"
+          ]
+        },
+        "AU-9": {
+          "title": "Protection of Audit Information",
+          "requirements": [
+            "AU-9(1): Hardware Write-Once Media",
+            "AU-9(2): Backup Audit Record"
+          ]
+        }
+      }
+    },
+    "CM": {
+      "name": "Configuration Management",
+      "controls": {
+        "CM-2": {
+          "title": "Baseline Configuration",
+          "requirements": [
+            "CM-2(1): Reviews and Updates",
+            "CM-2(2): Automation Support"
+          ]
+        },
+        "CM-7": {
+          "title": "Least Functionality",
+          "requirements": [
+            "CM-7(1): Periodic Review",
+            "CM-7(2): Prevent Program Execution"
+          ]
+        },
+        "CM-8": {
+          "title": "System Component Inventory",
+          "requirements": [
+            "CM-8(1): Updates During Installation",
+            "CM-8(2): Automated Maintenance"
+          ]
+        }
+      }
+    },
+    "IA": {
+      "name": "Identification and Authentication",
+      "controls": {
+        "IA-2": {
+          "title": "Identification and Authentication",
+          "requirements": [
+            "IA-2(1): Multi-Factor Authentication",
+            "IA-2(2): Multi-Factor Authentication for Network Access"
+          ]
+        },
+        "IA-5": {
+          "title": "Authenticator Management",
+          "requirements": [
+            "IA-5(1): Password-Based Authentication",
+            "IA-5(2): Public Key-Based Authentication"
+          ]
+        }
+      }
+    },
+    "SC": {
+      "name": "System and Communications Protection",
+      "controls": {
+        "SC-7": {
+          "title": "Boundary Protection",
+          "requirements": [
+            "SC-7(1): Physically Separated Subnetworks",
+            "SC-7(3): Access Points"
+          ]
+        },
+        "SC-8": {
+          "title": "Transmission Confidentiality and Integrity",
+          "requirements": [
+            "SC-8(1): Cryptographic Protection"
+          ]
+        },
+        "SC-28": {
+          "title": "Protection of Information at Rest",
+          "requirements": [
+            "SC-28(1): Cryptographic Protection"
+          ]
+        }
+      }
+    },
+    "SI": {
+      "name": "System and Information Integrity",
+      "controls": {
+        "SI-2": {
+          "title": "Flaw Remediation",
+          "requirements": [
+            "SI-2(1): Central Management",
+            "SI-2(2): Automated Flaw Remediation Status"
+          ]
+        },
+        "SI-3": {
+          "title": "Malicious Code Protection",
+          "requirements": [
+            "SI-3(1): Central Management",
+            "SI-3(2): Automatic Updates"
+          ]
+        },
+        "SI-4": {
+          "title": "System Monitoring",
+          "requirements": [
+            "SI-4(1): System-Wide Intrusion Detection System",
+            "SI-4(2): Automated Tools and Mechanisms for Real-Time Analysis"
+          ]
+        },
+        "SI-5": {
+          "title": "Security Alerts, Advisories, and Directives",
+          "requirements": [
+            "SI-5(1): Automated Alerts and Advisories"
+          ]
+        },
+        "SI-6": {
+          "title": "Security Function Verification",
+          "requirements": [
+            "SI-6(1): Notification of Failed Security Verification Tests"
+          ]
+        }
+      }
+    },
+    "IR": {
+      "name": "Incident Response",
+      "controls": {
+        "IR-4": {
+          "title": "Incident Handling",
+          "requirements": [
+            "IR-4(1): Automated Incident Handling Processes"
+          ]
+        },
+        "IR-5": {
+          "title": "Incident Monitoring",
+          "requirements": [
+            "IR-5(1): Automated Tracking / Data Collection / Analysis"
+          ]
+        },
+        "IR-6": {
+          "title": "Incident Reporting",
+          "requirements": [
+            "IR-6(1): Automated Reporting"
+          ]
+        },
+        "IR-7": {
+          "title": "Incident Response Assistance",
+          "requirements": [
+            "IR-7(1): Automation Support for Availability of Information"
+          ]
+        },
+        "IR-8": {
+          "title": "Incident Response Plan",
+          "requirements": [
+            "IR-8(1): Breaches"
+          ]
+        }
+      }
+    },
+    "RA": {
+      "name": "Risk Assessment",
+      "controls": {
+        "RA-3": {
+          "title": "Risk Assessment",
+          "requirements": [
+            "RA-3(1): Supply Chain Risk Assessment"
+          ]
+        },
+        "RA-5": {
+          "title": "Vulnerability Monitoring and Scanning",
+          "requirements": [
+            "RA-5(1): Update Tool Capability",
+            "RA-5(2): Update System Vulnerabilities"
+          ]
+        },
+        "RA-6": {
+          "title": "Technical Surveillance Countermeasures Survey",
+          "requirements": []
+        }
+      }
+    },
+    "CP": {
+      "name": "Contingency Planning",
+      "controls": {
+        "CP-4": {
+          "title": "Contingency Plan Testing",
+          "requirements": [
+            "CP-4(1): Coordinate with Related Plans"
+          ]
+        },
+        "CP-9": {
+          "title": "System Backup",
+          "requirements": [
+            "CP-9(1): Testing for Reliability and Integrity"
+          ]
+        },
+        "CP-10": {
+          "title": "System Recovery and Reconstitution",
+          "requirements": [
+            "CP-10(1): Contingency Plan Testing"
+          ]
+        }
+      }
+    },
+    "AC-4": {
+      "name": "Access Control",
+      "controls": {
+        "AC-4": {
+          "title": "Information Flow Enforcement",
+          "requirements": [
+            "AC-4(1): Object Security Attributes"
+          ]
+        }
+      }
+    },
+    "SC-12": {
+      "name": "System and Communications Protection",
+      "controls": {
+        "SC-12": {
+          "title": "Cryptographic Key Establishment and Management",
+          "requirements": [
+            "SC-12(1): Availability"
+          ]
+        },
+        "SC-13": {
+          "title": "Cryptographic Protection",
+          "requirements": [
+            "SC-13(1): FIPS-Validated Cryptography"
+          ]
+        },
+        "SC-20": {
+          "title": "Secure Name/Address Resolution Service (Authoritative Source)",
+          "requirements": []
+        },
+        "SC-21": {
+          "title": "Secure Name/Address Resolution Service (Recursive or Caching Resolver)",
+          "requirements": []
+        }
+      }
+    },
+    "AU-4": {
+      "name": "Audit and Accountability",
+      "controls": {
+        "AU-4": {
+          "title": "Audit Log Storage Capacity",
+          "requirements": [
+            "AU-4(1): Transfer to Alternate Storage"
+          ]
+        },
+        "AU-11": {
+          "title": "Audit Record Retention",
+          "requirements": []
+        }
+      }
+    }
+  }
+}

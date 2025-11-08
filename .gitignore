@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# AWS credentials
+.aws/
+*.pem
+
+# Reports
+reports/
+
+# Distribution
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# llm
+llm-docs/
+
+# Local environment variables
+.env
+
+# Test files
+test_reports/
