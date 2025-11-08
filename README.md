@@ -1,4 +1,4 @@
-# Kovr AWS Multi-Framework Compliance Checker
+# ProGRC Multi-Framework Compliance Checker
 
 A comprehensive Python application that validates AWS environments for compliance with multiple security frameworks including NIST 800-53, NIST 800-171, CIS AWS Benchmark, MITRE ATT&CK, OWASP Cloud Security, AWS Well-Architected Framework, and more. This tool provides parallel execution, multi-framework mapping, and comprehensive reporting capabilities.
 
