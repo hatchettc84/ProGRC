@@ -274,6 +274,195 @@ class MultiFrameworkReporter:
         print(f"Enhanced CSV report generated: {file_path}")
         return file_path
     
+    def generate_enhanced_csv_report_string(self) -> str:
+        """Generate enhanced CSV report as string (for API responses)."""
+        import io
+        
+        output = io.StringIO()
+        fieldnames = [
+            "check_id",
+            "check_name",
+            "status",
+            "severity",
+            "framework_source",
+            "nist_800_53_controls",
+            "nist_800_171_controls",
+            "cis_aws_controls",
+            "mitre_attack_techniques",
+            "findings_count",
+            "affected_resources",
+            "account_id",
+            "regions_checked",
+            "timestamp",
+            "remediation_effort",
+            "business_impact"
+        ]
+        
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        for result in self.results:
+            check_id = result["check_id"]
+            check_mappings = self.framework_mappings["check_mappings"].get(
+                check_id, {}
+            ).get("frameworks", {})
+            
+            # Estimate remediation effort based on severity
+            effort_map = {
+                "CRITICAL": "High",
+                "HIGH": "Medium-High",
+                "MEDIUM": "Medium",
+                "LOW": "Low"
+            }
+            
+            row = {
+                "check_id": check_id,
+                "check_name": result["check_name"],
+                "status": result["status"],
+                "severity": result.get("severity", "Unknown"),
+                "framework_source": result.get("framework", "Multiple"),
+                "nist_800_53_controls": ", ".join(check_mappings.get("nist_800_53", [])),
+                "nist_800_171_controls": ", ".join(check_mappings.get("nist_800_171", [])),
+                "cis_aws_controls": ", ".join(check_mappings.get("cis_aws", [])),
+                "mitre_attack_techniques": ", ".join(check_mappings.get("mitre_attack", [])),
+                "findings_count": len(result.get("findings", [])),
+                "affected_resources": ", ".join(result.get("affected_resources", [])),
+                "account_id": result.get("account_id", "Unknown"),
+                "regions_checked": ", ".join(result.get("regions_checked", [result.get("region", "Unknown")])),
+                "timestamp": result.get("timestamp", ""),
+                "remediation_effort": effort_map.get(result.get("severity", ""), "Unknown"),
+                "business_impact": self._assess_business_impact(result)
+            }
+            
+            writer.writerow(row)
+        
+        return output.getvalue()
+    
+    def generate_nist_800_53_report_string(self) -> str:
+        """Generate NIST 800-53 report as markdown string (for API responses)."""
+        import io
+        
+        output = io.StringIO()
+        output.write("# NIST 800-53 Compliance Report\n\n")
+        output.write(f"**Generated:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}\n")
+        output.write(f"**Framework Version:** Rev 5\n\n")
+        
+        # Group results by NIST 800-53 controls
+        control_results = self._group_by_framework_controls("nist_800_53")
+        
+        # Generate executive summary
+        output.write("## Executive Summary\n\n")
+        summary = self._generate_framework_summary(control_results, "nist_800_53")
+        output.write(summary)
+        
+        # Generate detailed findings by control family
+        output.write("\n## Detailed Findings by Control Family\n\n")
+        
+        for family_id, family_data in self.nist_800_53_mappings.get("control_families", {}).items():
+            output.write(f"### {family_id} - {family_data['name']}\n\n")
+            
+            # Check each control in the family
+            for control_id, control_data in family_data.get("controls", {}).items():
+                if control_id in control_results:
+                    output.write(f"#### {control_id}: {control_data['title']}\n\n")
+                    
+                    # List all checks that map to this control
+                    for check_result in control_results[control_id]:
+                        status_emoji = "✅" if check_result["status"] == "PASS" else "❌"
+                        output.write(f"- {status_emoji} **{check_result['check_name']}** ({check_result['check_id']})\n")
+                        
+                        if check_result["status"] == "FAIL":
+                            output.write(f"  - Severity: {check_result.get('severity', 'Unknown')}\n")
+                            output.write(f"  - Findings: {len(check_result.get('findings', []))}\n")
+                            output.write(f"  - Affected Resources: {', '.join(check_result.get('affected_resources', []))}\n")
+                    
+                    output.write("\n")
+        
+        return output.getvalue()
+    
+    def generate_nist_800_171_report_string(self) -> str:
+        """Generate NIST 800-171 report as markdown string (for API responses)."""
+        import io
+        
+        output = io.StringIO()
+        output.write("# NIST 800-171 Compliance Report\n\n")
+        output.write(f"**Generated:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}\n")
+        output.write(f"**Framework Version:** Rev 2\n")
+        output.write("**Purpose:** Protecting Controlled Unclassified Information (CUI)\n\n")
+        
+        # Group results by NIST 800-171 controls
+        control_results = self._group_by_framework_controls("nist_800_171")
+        
+        # Generate executive summary
+        output.write("## Executive Summary\n\n")
+        summary = self._generate_framework_summary(control_results, "nist_800_171")
+        output.write(summary)
+        
+        # Generate detailed findings by control family
+        output.write("\n## Detailed Findings by Control Family\n\n")
+        
+        for family_id, family_data in self.nist_800_171_mappings.get("control_families", {}).items():
+            output.write(f"### {family_id} - {family_data['name']}\n\n")
+            
+            # Check each control in the family
+            for control_id, control_data in family_data.get("controls", {}).items():
+                if control_id in control_results:
+                    output.write(f"#### {control_id}: {control_data['title']}\n")
+                    output.write(f"*{control_data['description']}*\n\n")
+                    
+                    # List all checks that map to this control
+                    for check_result in control_results[control_id]:
+                        status_emoji = "✅" if check_result["status"] == "PASS" else "❌"
+                        output.write(f"- {status_emoji} **{check_result['check_name']}** ({check_result['check_id']})\n")
+                        
+                        if check_result["status"] == "PASS":
+                            output.write(f"  - Evidence: Check passed, control requirement satisfied\n")
+                        else:
+                            output.write(f"  - Severity: {check_result.get('severity', 'Unknown')}\n")
+                            output.write(f"  - Findings: {len(check_result.get('findings', []))}\n")
+                    
+                    output.write("\n")
+        
+        return output.getvalue()
+    
+    def generate_cross_framework_matrix_string(self) -> str:
+        """Generate cross-framework matrix as CSV string (for API responses)."""
+        import io
+        
+        output = io.StringIO()
+        # Get all available frameworks
+        frameworks = list(self.framework_mappings["frameworks"].keys())
+        
+        # Define fields
+        fieldnames = ["check_id", "check_name", "status", "severity"] + frameworks
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        # Process each result
+        for result in self.results:
+            check_id = result["check_id"]
+            
+            # Get mappings for this check
+            check_mappings = self.framework_mappings["check_mappings"].get(
+                check_id, {}
+            ).get("frameworks", {})
+            
+            row = {
+                "check_id": check_id,
+                "check_name": result["check_name"],
+                "status": result["status"],
+                "severity": result.get("severity", "Unknown")
+            }
+            
+            # Add framework mappings
+            for framework in frameworks:
+                controls = check_mappings.get(framework, [])
+                row[framework] = ", ".join(controls) if controls else "N/A"
+            
+            writer.writerow(row)
+        
+        return output.getvalue()
+    
     def generate_evidence_summary(self, output_dir: str) -> str:
         """Generate evidence summary for audit purposes."""
         file_path = os.path.join(output_dir, f"evidence_summary_{self.timestamp}.json")
