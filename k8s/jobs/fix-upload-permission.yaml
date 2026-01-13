@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fix-upload-permission
+  namespace: progrc-dev
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: registry-progrc
+      containers:
+      - name: fix-db
+        image: postgres:15-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            export PGPASSWORD="$POSTGRES_PASSWORD"
+            echo "Checking for permission..."
+            psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -c "SELECT api_path, method FROM permissions WHERE api_path = '/api/v1/app/upload/generate-presigned-url' AND method = 'POST'::api_method;"
+            echo ""
+            echo "Inserting/updating permission..."
+            psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -c "INSERT INTO permissions (api_path, method, allowed_roles, allowed_licenses, allow_all, created_at, updated_at) VALUES ('/api/v1/app/upload/generate-presigned-url', 'POST'::api_method, '[3,4,5]'::jsonb, '[]'::jsonb, false, NOW(), NOW()) ON CONFLICT (api_path, method) DO UPDATE SET allowed_roles = '[3,4,5]'::jsonb, updated_at = NOW();"
+            echo ""
+            echo "Verifying permission..."
+            psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -c "SELECT api_path, method, allowed_roles FROM permissions WHERE api_path = '/api/v1/app/upload/generate-presigned-url';"
+        envFrom:
+        - secretRef:
+            name: progrc-bff-db-credentials
+        env:
+        - name: POSTGRES_SSL
+          value: "true"
+        - name: PGSSLMODE
+          value: "require"

@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grant-db-permissions-admin
+  namespace: progrc-dev
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: psql
+        image: postgres:16-alpine
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Granting database permissions using admin credentials..."
+          echo ""
+          PGHOST=$(echo $POSTGRES_HOST | cut -d: -f1)
+          PGPORT=${POSTGRES_PORT:-5432}
+          
+          # Use admin credentials to grant permissions to progrc user
+          psql "host=$PGHOST port=$PGPORT dbname=$POSTGRES_DATABASE user=$ADMIN_USERNAME password=$ADMIN_PASSWORD sslmode=require" << EOF
+          -- Grant schema permissions
+          GRANT ALL PRIVILEGES ON SCHEMA public TO progrc;
+          GRANT ALL PRIVILEGES ON DATABASE progrc_bff_dev TO progrc;
+          
+          -- Grant default privileges for future objects
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO progrc;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO progrc;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO progrc;
+          
+          -- Verify permissions were granted
+          SELECT 
+            nspname as schema_name,
+            has_schema_privilege('progrc', nspname, 'CREATE') as can_create,
+            has_schema_privilege('progrc', nspname, 'USAGE') as can_use
+          FROM pg_namespace 
+          WHERE nspname = 'public';
+          
+          SELECT 
+            datname,
+            has_database_privilege('progrc', datname, 'CREATE') as can_create_db
+          FROM pg_database 
+          WHERE datname = 'progrc_bff_dev';
+          \q
+          EOF
+          
+          if [ $? -eq 0 ]; then
+            echo ""
+            echo "✅ Permissions granted successfully!"
+            echo "You can now run migrations."
+          else
+            echo ""
+            echo "❌ Failed to grant permissions. Check admin credentials."
+            exit 1
+          fi
+        env:
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+        - name: ADMIN_USERNAME
+          value: "doadmin"  # DigitalOcean admin user
+        - name: ADMIN_PASSWORD
+          value: "YOUR_DOADMIN_PASSWORD_HERE"  # You'll need to provide this
+
+
+

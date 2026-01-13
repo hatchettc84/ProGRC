@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: run-policy-templates-migration
+  namespace: progrc-dev
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: registry-progrc
+      containers:
+      - name: migration
+        image: registry.digitalocean.com/progrc/progrc-backend:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Running policy templates migration..."
+          node ./node_modules/typeorm/cli.js migration:run -d ./dist/config/typeorm.config.js
+          echo "Policy templates migration completed!"
+        envFrom:
+        - configMapRef:
+            name: progrc-config
+        - secretRef:
+            name: progrc-bff-dev-secrets
+        env:
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+        - name: POSTGRES_SSL
+          value: "true"
+

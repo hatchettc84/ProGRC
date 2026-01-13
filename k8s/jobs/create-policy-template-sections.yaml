@@ -1,0 +1,143 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-policy-template-sections
+  namespace: progrc-dev
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: registry-progrc
+      containers:
+      - name: migration
+        image: registry.digitalocean.com/progrc/progrc-backend:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Creating template sections for policy templates..."
+          node -e "
+          const {DataSource} = require('typeorm');
+          const config = require('./dist/config/typeorm.config.js');
+          const ds = new DataSource(config.dataSourceOptions);
+          const {v4: uuidv4} = require('uuid');
+          
+          ds.initialize()
+            .then(async () => {
+              console.log('Connected to database');
+              
+              // Get all policy templates
+              const templates = await ds.query(\`
+                SELECT id, name, created_by, upload_date, update_date
+                FROM templates 
+                WHERE entity_type = 'policy'
+              \`);
+              
+              console.log('Found', templates.length, 'policy templates');
+              
+              // Get user ID
+              const user = await ds.query('SELECT id FROM users WHERE role_id = 1 LIMIT 1');
+              const userId = user[0]?.id || '00000000-0000-0000-0000-000000000000';
+              
+              // Create sections for each template
+              for (const template of templates) {
+                // Check if section already exists
+                const existingSection = await ds.query(
+                  'SELECT id FROM templates_section WHERE template_id = \$1 LIMIT 1',
+                  [template.id]
+                );
+                
+                if (existingSection.length > 0) {
+                  console.log('Section already exists for', template.name);
+                  continue;
+                }
+                
+                // Get HTML content from policy_template
+                const policyTemplate = await ds.query(
+                  'SELECT content FROM policy_template WHERE name = \$1',
+                  [template.name]
+                );
+                
+                if (policyTemplate[0]?.content?.htmlContent) {
+                  const sectionId = uuidv4();
+                  await ds.query(\`
+                    INSERT INTO templates_section (
+                      template_id, title, section_id, html_content, is_active,
+                      type, parent_id, is_looped, created_by, updated_by, created_at, updated_at
+                    ) VALUES (
+                      \$1, \$2, \$3, \$4, true, 'GLOBAL', NULL, false, \$5::uuid, \$5::uuid, NOW(), NOW()
+                    )
+                  \`, [
+                    template.id,
+                    template.name,
+                    sectionId,
+                    policyTemplate[0].content.htmlContent,
+                    template.created_by || userId
+                  ]);
+                  console.log('✅ Created section for', template.name);
+                } else {
+                  console.log('⚠️  No HTML content found for', template.name);
+                }
+              }
+              
+              console.log('✅ Template sections created successfully!');
+              process.exit(0);
+            })
+            .catch(e => {
+              console.error('ERROR:', e.message);
+              console.error(e.stack);
+              process.exit(1);
+            });
+          "
+        envFrom:
+        - configMapRef:
+            name: progrc-config
+        - secretRef:
+            name: progrc-bff-dev-secrets
+        env:
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+        - name: POSTGRES_SSL
+          value: "true"
+
+
+

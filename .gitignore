@@ -1,0 +1,54 @@
+# compiled output
+/dist
+dist/
+/node_modules
+
+# Logs
+logs
+logs_bff
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+TODO
+
+# ENVS
+.env
+.env.*
+.env.dev
+.env.prod
+google-cloud-key.json
+fcm_key.json
+private_local
+
+# Security files
+*/*/aws-jwks.json
+
+# Profiler data
+profiles/
+*.heapsnapshot

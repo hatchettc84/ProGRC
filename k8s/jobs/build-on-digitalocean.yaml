@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-progrc-backend
+  namespace: progrc-dev
+spec:
+  ttlSecondsAfterFinished: 3600  # Clean up after 1 hour
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: kaniko
+        image: gcr.io/kaniko-project/executor:latest
+        args:
+        - --dockerfile=Dockerfile
+        - --context=dir:///workspace
+        - --destination=registry.digitalocean.com/progrc/progrc-backend:latest
+        - --cache=true
+        - --cache-ttl=24h
+        - --compressed-caching=false
+        - --verbosity=info
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+        - name: docker-config
+          mountPath: /kaniko/.docker
+        env:
+        - name: DOCKER_CONFIG
+          value: /kaniko/.docker
+      volumes:
+      - name: workspace
+        configMap:
+          name: progrc-backend-source
+      - name: docker-config
+        secret:
+          secretName: docker-registry-secret
+          items:
+          - key: .dockerconfigjson
+            path: config.json
+
+

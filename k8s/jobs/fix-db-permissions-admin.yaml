@@ -1,0 +1,90 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fix-db-permissions-admin
+  namespace: progrc-dev
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: psql
+        image: postgres:16-alpine
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Attempting to fix database permissions..."
+          echo ""
+          echo "NOTE: For DigitalOcean managed databases, you typically need:"
+          echo "1. Admin database credentials (not the application user)"
+          echo "2. Or use DigitalOcean Console to grant permissions"
+          echo ""
+          echo "If you have admin credentials, update this job with:"
+          echo "  - POSTGRES_ADMIN_USERNAME"
+          echo "  - POSTGRES_ADMIN_PASSWORD"
+          echo ""
+          echo "Otherwise, use DigitalOcean Console:"
+          echo "1. Go to: https://cloud.digitalocean.com/databases"
+          echo "2. Select your database cluster"
+          echo "3. Go to 'Users & Databases' tab"
+          echo "4. Find 'progrc' user and ensure it has 'Can create databases' enabled"
+          echo ""
+          echo "Or connect as admin and run:"
+          echo "  GRANT ALL PRIVILEGES ON SCHEMA public TO progrc;"
+          echo "  GRANT ALL PRIVILEGES ON DATABASE progrc_bff_dev TO progrc;"
+          echo "  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO progrc;"
+          echo "  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO progrc;"
+          echo ""
+          echo "Checking current connection..."
+          PGHOST=$(echo $POSTGRES_HOST | cut -d: -f1)
+          PGPORT=${POSTGRES_PORT:-5432}
+          
+          psql "host=$PGHOST port=$PGPORT dbname=$POSTGRES_DATABASE user=$POSTGRES_USERNAME password=$POSTGRES_PASSWORD sslmode=require" -c "SELECT current_user, current_database();" || echo "Connection failed"
+          
+          echo ""
+          echo "Current user permissions check:"
+          psql "host=$PGHOST port=$PGPORT dbname=$POSTGRES_DATABASE user=$POSTGRES_USERNAME password=$POSTGRES_PASSWORD sslmode=require" << EOF
+          SELECT 
+            nspname as schema_name,
+            has_schema_privilege('$POSTGRES_USERNAME', nspname, 'CREATE') as can_create,
+            has_schema_privilege('$POSTGRES_USERNAME', nspname, 'USAGE') as can_use
+          FROM pg_namespace 
+          WHERE nspname = 'public';
+          
+          SELECT 
+            datname,
+            has_database_privilege('$POSTGRES_USERNAME', datname, 'CREATE') as can_create_db
+          FROM pg_database 
+          WHERE datname = '$POSTGRES_DATABASE';
+          \q
+          EOF
+        env:
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+
+
+

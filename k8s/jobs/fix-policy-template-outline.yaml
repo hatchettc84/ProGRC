@@ -1,0 +1,124 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fix-policy-template-outline
+  namespace: progrc-dev
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: registry-progrc
+      containers:
+      - name: migration
+        image: registry.digitalocean.com/progrc/progrc-backend:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Fixing policy template outlines..."
+          node -e "
+          const {DataSource} = require('typeorm');
+          const config = require('./dist/config/typeorm.config.js');
+          const ds = new DataSource(config.dataSourceOptions);
+          
+          ds.initialize()
+            .then(async () => {
+              console.log('Connected to database');
+              
+              // Get all policy templates
+              const templates = await ds.query(\`
+                SELECT id, name, outline
+                FROM templates 
+                WHERE entity_type = 'policy'
+              \`);
+              
+              console.log('Found', templates.length, 'policy templates');
+              
+              // Fix outlines that are objects instead of arrays
+              for (const template of templates) {
+                let needsUpdate = false;
+                let newOutline = template.outline;
+                
+                // Check if outline is an object instead of array
+                if (template.outline && !Array.isArray(template.outline)) {
+                  console.log('Fixing outline for', template.name, '- was:', typeof template.outline);
+                  newOutline = [];
+                  needsUpdate = true;
+                } else if (!template.outline) {
+                  console.log('Setting empty array outline for', template.name);
+                  newOutline = [];
+                  needsUpdate = true;
+                }
+                
+                if (needsUpdate) {
+                  await ds.query(
+                    'UPDATE templates SET outline = \$1::json WHERE id = \$2',
+                    [JSON.stringify(newOutline), template.id]
+                  );
+                  console.log('✅ Fixed outline for', template.name);
+                } else {
+                  console.log('✓ Outline already correct for', template.name);
+                }
+              }
+              
+              console.log('✅ All policy template outlines fixed!');
+              process.exit(0);
+            })
+            .catch(e => {
+              console.error('ERROR:', e.message);
+              console.error(e.stack);
+              process.exit(1);
+            });
+          "
+        envFrom:
+        - configMapRef:
+            name: progrc-config
+        - secretRef:
+            name: progrc-bff-dev-secrets
+        env:
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+        - name: POSTGRES_SSL
+          value: "true"
+
+
+

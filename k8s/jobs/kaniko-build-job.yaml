@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-progrc-backend-kaniko
+  namespace: progrc-dev
+spec:
+  ttlSecondsAfterFinished: 3600  # Clean up after 1 hour
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: kaniko
+        image: gcr.io/kaniko-project/executor:latest
+        args:
+        - --dockerfile=Dockerfile
+        - --context=dir:///workspace
+        - --destination=registry.digitalocean.com/progrc/progrc-backend:latest
+        - --cache=true
+        - --cache-ttl=24h
+        - --compressed-caching=false
+        - --verbosity=info
+        - --skip-tls-verify
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+        - name: docker-config
+          mountPath: /kaniko/.docker
+        env:
+        - name: DOCKER_CONFIG
+          value: /kaniko/.docker
+      volumes:
+      - name: workspace
+        emptyDir: {}
+      - name: docker-config
+        secret:
+          secretName: registry-progrc
+          items:
+          - key: .dockerconfigjson
+            path: config.json
+      initContainers:
+      - name: git-clone
+        image: alpine/git:latest
+        command: ['sh', '-c']
+        args:
+        - |
+          set -e
+          echo "Cloning repository..."
+          git clone --depth 1 --single-branch --branch main https://github.com/YOUR_ORG/YOUR_REPO.git /workspace
+          # OR if private repo:
+          # git clone --depth 1 --single-branch --branch main https://$GIT_TOKEN@github.com/YOUR_ORG/YOUR_REPO.git /workspace
+          echo "Repository cloned successfully"
+          ls -la /workspace
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace

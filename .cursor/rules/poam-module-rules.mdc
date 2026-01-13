@@ -1,0 +1,61 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# POAM Module Development Guide
+
+## Overview
+Create a new POAM (Plan of Action and Milestones) Module in a NestJS application providing complete CRUD operations via REST API. Create the directory and files needed at appropriate places.
+
+## Entity Structure
+The POAM entity will include the following fields:
+- id (primary key)
+- jira_id (unique)
+- title
+- description
+- status (constrained to valid values)
+- priority (constrained to valid values)
+- control_ids
+- standard_ids
+- application_id
+- created_at
+- updated_at
+- created_by
+- updated_by
+- current_assigned
+- base_recommendation_grouping
+
+## Requirements
+
+### Entity & Module Setup
+- Define a POAM entity mapping to the structure above
+- Create a dedicated PoamModule to encapsulate functionality
+
+### CRUD Operations
+Implement the following API endpoints:
+- **GET**: Retrieve POAM record(s)
+- **POST**: Create a new POAM record
+- **PUT**: Fully update an existing POAM record
+- **PATCH**: Partially update a POAM record
+- **DELETE**: Remove a POAM record
+
+**Note**: All endpoints must require an `app_id` parameter for application context.
+
+### Authorization & Role Restrictions
+#### Access Control
+Allow operations only if user:
+- Has mapping in app_user table for specified application, OR
+- Is a valid CSM of the organization, OR
+- Is a valid CSM Auditor assigned to the application
+
+#### Role-based Restrictions
+- **GET**: All roles
+- **POST, PUT, PATCH, DELETE**: Restricted to roles org_member, org_admin, csm, or superadmin
+
+### Implementation Guidelines
+- Use NestJS guards and custom decorators for auth enforcement
+- Validate app_id parameter in each request
+- Implement proper error handling
+- Write comprehensive integration tests
+- Follow NestJS best practices and maintain modular architecture

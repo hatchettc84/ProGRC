@@ -1,0 +1,234 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Database Migration Rules
+
+## CRITICAL RULES - MUST FOLLOW
+
+### 1. Migration Creation
+**🚨 NEVER manually create migration files without proper timestamps!**
+
+#### ALWAYS Use NPM Script (Preferred Method):
+```bash
+npm run migration:create --name=<DescriptiveName>
+```
+
+#### Examples of Correct Usage:
+```bash
+# Good examples
+npm run migration:create --name=AddUserEmailVerification
+npm run migration:create --name=CreatePaymentTable
+npm run migration:create --name=UpdateCustomerIndexes
+npm run migration:create --name=AlterUserAddMfaSettings
+npm run migration:create --name=RemoveDeprecatedColumns
+
+# Bad examples (don't use)
+npm run migration:create --name=userStuff
+npm run migration:create --name=update
+npm run migration:create --name=fix
+```
+
+### 2. Manual Timestamp Format (Only if NPM script fails)
+If you must manually create a migration file, use this exact format:
+
+**Format:** `YYYYMMDDHHMMSS-<DescriptiveName>.ts`
+
+**Current timestamp generation:**
+```javascript
+// Use this in browser console or Node.js to get current timestamp
+new Date().toISOString().replace(/[-T:\.Z]/g, '').slice(0, 14)
+// Example output: 20241220143045
+```
+
+## Naming Conventions
+
+### File Names
+- Use PascalCase for the descriptive part
+- Start with an action verb
+- Include the entity/table name
+- Be specific and clear
+- Maximum 50 characters for descriptive part
+
+### Action Verbs to Use:
+- **Add** - Adding new columns/indexes
+- **Create** - Creating new tables/entities
+- **Update** - Modifying existing data
+- **Alter** - Changing table structure
+- **Remove** / **Drop** - Deleting columns/tables
+- **Insert** - Adding seed/reference data
+- **Modify** - Complex structural changes
+
+### Examples:
+✅ **Good:**
+- `CreateUserProfileTable`
+- `AddEmailVerificationToUsers`
+- `UpdateCustomerPermissions`
+- `AlterPaymentAddStripeFields`
+- `RemoveDeprecatedAuthColumns`
+- `InsertDefaultUserRoles`
+
+❌ **Bad:**
+- `UserTable`
+- `UpdateStuff`
+- `FixBug`
+- `Changes`
+- `Migration1`
+
+## Migration File Structure
+
+### Required Template:
+```typescript
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class YourMigrationName20241220143045 implements MigrationInterface {
+    name = 'YourMigrationName20241220143045'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        // Forward migration logic
+        // Add your SQL queries here
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        // Rollback migration logic
+        // Add reverse SQL queries here
+    }
+}
+```
+
+### Best Practices for Migration Content:
+
+#### 1. Always Include Rollback Logic
+```typescript
+public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE "users" ADD "email_verified" boolean DEFAULT false`);
+}
+
+public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "email_verified"`);
+}
+```
+
+#### 2. Use Transactions for Complex Operations
+```typescript
+public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.startTransaction();
+    try {
+        await queryRunner.query(`CREATE TABLE "payments" (...)`);
+        await queryRunner.query(`CREATE INDEX "IDX_payments_user_id" ON "payments" ("user_id")`);
+        await queryRunner.commitTransaction();
+    } catch (err) {
+        await queryRunner.rollbackTransaction();
+        throw err;
+    }
+}
+```
+
+#### 3. Add Comments for Complex Logic
+```typescript
+public async up(queryRunner: QueryRunner): Promise<void> {
+    // Migrate existing user preferences to new JSON format
+    await queryRunner.query(`
+        UPDATE users 
+        SET preferences = '{"theme": "light", "notifications": true}'::jsonb 
+        WHERE preferences IS NULL
+    `);
+}
+```
+
+## NPM Scripts Reference
+
+### Available Commands:
+```bash
+# Create new migration
+npm run migration:create --name=<MigrationName>
+
+# Run all pending migrations
+npm run migration:up
+
+# Revert the last migration
+npm run migration:down
+
+# Show migration status
+npm run typeorm migration:show -d ./src/config/typeorm.config.ts
+```
+
+## Common Pitfalls to Avoid
+
+### ❌ DON'T:
+1. Create files without timestamps
+2. Use generic names like "Update" or "Fix"
+3. Forget to implement the `down()` method
+4. Make irreversible changes without backups
+5. Include business logic in migrations
+6. Use hardcoded IDs that might not exist in other environments
+
+### ✅ DO:
+1. Always use the NPM script
+2. Write descriptive names
+3. Test both up and down migrations
+4. Keep migrations focused on single concerns
+5. Add comments for complex operations
+6. Use parameterized queries for data operations
+
+## Emergency Procedures
+
+### If Migration Fails in Production:
+1. **Don't panic** - check the error logs
+2. **Rollback immediately**: `npm run migration:down`
+3. **Fix the issue** in a new migration
+4. **Test thoroughly** in staging
+5. **Deploy the fix** with proper coordination
+
+### If Timestamp Conflicts Occur:
+1. **Rename the conflicting file** with a new timestamp
+2. **Update the class name** to match the new timestamp
+3. **Update the `name` property** in the class
+4. **Commit the changes** with clear commit message
+
+## Validation Checklist
+
+Before creating any migration, verify:
+- [ ] Used `npm run migration:create --name=<DescriptiveName>`
+- [ ] Name follows PascalCase convention
+- [ ] Name includes action verb and entity
+- [ ] Both `up()` and `down()` methods are implemented
+- [ ] Migration is tested locally
+- [ ] Rollback is tested and works
+- [ ] Complex operations use transactions
+- [ ] No hardcoded environment-specific values
+
+## Examples by Type
+
+### Creating Tables:
+```bash
+npm run migration:create --name=CreatePaymentHistoryTable
+```
+
+### Adding Columns:
+```bash
+npm run migration:create --name=AddTwoFactorAuthToUsers
+```
+
+### Creating Indexes:
+```bash
+npm run migration:create --name=AddIndexesToPaymentQueries
+```
+
+### Data Migrations:
+```bash
+npm run migration:create --name=MigrateUserPreferencesToJson
+```
+
+### Removing Features:
+```bash
+npm run migration:create --name=RemoveDeprecatedAuthMethods
+```
+
+Following these rules ensures:
+- **Consistency** across all team members
+- **Proper ordering** of migrations
+- **Conflict-free** deployments
+- **Reliable rollbacks** when needed
+- **Clear history** of database changes

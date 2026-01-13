@@ -1,0 +1,107 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: progrc-backend-netpol
+  namespace: progrc-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: progrc-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from Ingress Controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow traffic from frontend pods
+  - from:
+    - podSelector:
+        matchLabels:
+          app: progrc-frontend
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  # Allow traffic to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow traffic to PostgreSQL (managed database - external)
+  # DigitalOcean managed databases use port 25060 (not 5432)
+  - to: []  # Allow all egress to external PostgreSQL
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 25060  # ✅ Added: DigitalOcean managed database port
+  # Allow traffic to Ollama (external AI Droplet)
+  - to: []  # Allow all egress to external Ollama
+    ports:
+    - protocol: TCP
+      port: 11434
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS for external API calls (if needed)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: progrc-frontend-netpol
+  namespace: progrc-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: progrc-frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from Ingress Controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow traffic from LoadBalancer (frontend service is LoadBalancer type)
+  - from: []  # Allow all ingress (LoadBalancer traffic comes from anywhere)
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow traffic to backend
+  - to:
+    - podSelector:
+        matchLabels:
+          app: progrc-backend
+    ports:
+    - protocol: TCP
+      port: 3000
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow HTTPS for external resources (CDN, fonts, etc.)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443

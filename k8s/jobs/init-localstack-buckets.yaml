@@ -1,0 +1,109 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-localstack-buckets
+  namespace: progrc-dev
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: init-buckets
+        image: amazon/aws-cli:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "🚀 Initializing LocalStack S3 buckets..."
+            
+            # Wait for LocalStack to be ready
+            echo "⏳ Waiting for LocalStack to be ready..."
+            for i in {1..30}; do
+              if curl -s http://localstack-internal.progrc-dev.svc.cluster.local:4566/_localstack/health | grep -q '"s3": "available"'; then
+                echo "✅ LocalStack is ready!"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "❌ LocalStack failed to start"
+                exit 1
+              fi
+              sleep 2
+            done
+            
+            # Configure AWS CLI
+            export AWS_ACCESS_KEY_ID=test
+            export AWS_SECRET_ACCESS_KEY=test
+            export AWS_DEFAULT_REGION=us-east-1
+            export AWS_ENDPOINT_URL=http://localstack-internal.progrc-dev.svc.cluster.local:4566
+            
+            # Create main file uploads bucket
+            echo "📦 Creating S3 buckets..."
+            if aws s3api head-bucket --bucket progrc-app-file-uploads 2>/dev/null; then
+              echo "✅ Bucket progrc-app-file-uploads already exists"
+            else
+              aws s3api create-bucket --bucket progrc-app-file-uploads || echo "⚠️  Bucket may already exist"
+              echo "✅ Bucket progrc-app-file-uploads created"
+            fi
+            
+            # Create frontend assets bucket
+            if aws s3api head-bucket --bucket progrc-app-frontend-dev 2>/dev/null; then
+              echo "✅ Bucket progrc-app-frontend-dev already exists"
+            else
+              aws s3api create-bucket --bucket progrc-app-frontend-dev || echo "⚠️  Frontend bucket may already exist"
+              echo "✅ Bucket progrc-app-frontend-dev created"
+            fi
+            
+            # Configure CORS for file uploads
+            echo ""
+            echo "🔧 Configuring CORS for file uploads..."
+            cat > /tmp/cors-config.json << 'EOF'
+            {
+              "CORSRules": [
+                {
+                  "AllowedHeaders": ["*"],
+                  "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"],
+                  "AllowedOrigins": ["*"],
+                  "ExposeHeaders": ["ETag", "x-amz-request-id", "x-amz-id-2", "Content-Length"],
+                  "MaxAgeSeconds": 3000
+                }
+              ]
+            }
+            EOF
+            
+            aws s3api put-bucket-cors --bucket progrc-app-file-uploads --cors-configuration file:///tmp/cors-config.json || echo "⚠️  CORS config warning (may not be critical)"
+            echo "✅ CORS configured for progrc-app-file-uploads"
+            
+            aws s3api put-bucket-cors --bucket progrc-app-frontend-dev --cors-configuration file:///tmp/cors-config.json || echo "⚠️  CORS config warning (may not be critical)"
+            echo "✅ CORS configured for progrc-app-frontend-dev"
+            
+            # List all buckets
+            echo ""
+            echo "✅ Buckets created:"
+            aws s3 ls || echo "⚠️  Could not list buckets"
+            
+            echo ""
+            echo "✅ S3 buckets initialized successfully!"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+

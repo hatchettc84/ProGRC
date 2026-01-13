@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: progrc-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+      - name: localstack
+        image: localstack/localstack:latest
+        ports:
+        - containerPort: 4566
+        env:
+        - name: SERVICES
+          value: "s3"
+        - name: DEBUG
+          value: "0"
+        - name: DATA_DIR
+          value: "/tmp/localstack/data"
+        - name: PERSISTENCE
+          value: "1"
+        - name: DOCKER_HOST
+          value: "unix:///var/run/docker.sock"
+        - name: DISABLE_CORS_CHECKS
+          value: "1"
+        - name: DISABLE_CUSTOM_CORS_S3
+          value: "1"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp/localstack
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  namespace: progrc-dev
+spec:
+  type: LoadBalancer
+  selector:
+    app: localstack
+  ports:
+  - port: 4566
+    targetPort: 4566
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack-internal
+  namespace: progrc-dev
+spec:
+  selector:
+    app: localstack
+  ports:
+  - port: 4566
+    targetPort: 4566
+  clusterIP: None
+

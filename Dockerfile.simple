@@ -1,0 +1,130 @@
+# syntax=docker/dockerfile:1
+
+########################
+# Stage 1: Build App
+########################
+FROM node:24-alpine AS builder
+
+USER root
+WORKDIR /home/node/bff-service-backend
+
+COPY package*.json .npmrc ./
+RUN npm cache clean --force && \
+    rm -rf node_modules && \
+    npm ci && rm -rf ~/.npm
+
+COPY . .
+RUN npm run build
+
+########################
+# Stage 2: Production dependencies
+########################
+FROM node:24-alpine AS dependencies
+
+USER root
+WORKDIR /home/node/bff-service-backend
+
+COPY package*.json .npmrc ./
+RUN npm cache clean --force && \
+    rm -rf node_modules && \
+    npm ci --omit=dev --ignore-scripts && \
+    rm -rf ~/.npm
+
+########################
+# Stage 3: Final Image
+########################
+FROM node:24-alpine
+
+ENV NODE_ENV=production \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    PORT=3000
+
+USER root
+
+WORKDIR /home/node/bff-service-backend
+
+# Install Chromium and dependencies directly in Alpine
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto-emoji \
+    wqy-zenhei
+
+# Setup application directories and user
+RUN mkdir -p /logs_bff && \
+    adduser -D -u 65532 appuser && \
+    chown -R 65532:65532 /logs_bff && \
+    chmod -R 755 /logs_bff && \
+    chown -R 65532:65532 /home/node/bff-service-backend
+
+# Copy built app
+COPY --from=builder /home/node/bff-service-backend/dist ./dist
+COPY --from=builder /home/node/bff-service-backend/package.json ./
+# Create optional directories/files if they don't exist
+RUN mkdir -p ./static || true
+RUN touch ./newrelic.js || true
+
+# Copy production dependencies
+COPY --from=dependencies /home/node/bff-service-backend/node_modules ./node_modules
+
+# Create startup script
+RUN echo 'const { spawn } = require("child_process");' > startup.js && \
+    echo 'const fs = require("fs");' >> startup.js && \
+    echo 'const path = require("path");' >> startup.js && \
+    echo '' >> startup.js && \
+    echo 'function startApp() {' >> startup.js && \
+    echo '  console.log("Starting NestJS application...");' >> startup.js && \
+    echo '  const app = spawn("/usr/local/bin/node", [' >> startup.js && \
+    echo '    "--max-old-space-size=4096",' >> startup.js && \
+    echo '    fs.existsSync("dist/src/main.js") ? "dist/src/main.js" : "dist/main.js"' >> startup.js && \
+    echo '  ], { stdio: "inherit" });' >> startup.js && \
+    echo '  app.on("close", (code) => {' >> startup.js && \
+    echo '    process.exit(code);' >> startup.js && \
+    echo '  });' >> startup.js && \
+    echo '}' >> startup.js && \
+    echo '' >> startup.js && \
+    echo 'const configPath = "./dist/config/typeorm.config.js";' >> startup.js && \
+    echo 'if (fs.existsSync(configPath)) {' >> startup.js && \
+    echo '  console.log("Running database migrations...");' >> startup.js && \
+    echo '  const migration = spawn("/usr/local/bin/node", [' >> startup.js && \
+    echo '    "./node_modules/typeorm/cli.js",' >> startup.js && \
+    echo '    "migration:run",' >> startup.js && \
+    echo '    "-d",' >> startup.js && \
+    echo '    configPath' >> startup.js && \
+    echo '  ], { stdio: "inherit" });' >> startup.js && \
+    echo '  migration.on("close", (code) => {' >> startup.js && \
+    echo '    if (code !== 0) {' >> startup.js && \
+    echo '      console.warn("Migration failed with code:", code, "- continuing anyway");' >> startup.js && \
+    echo '    } else {' >> startup.js && \
+    echo '      console.log("Migrations completed successfully!");' >> startup.js && \
+    echo '    }' >> startup.js && \
+    echo '    startApp();' >> startup.js && \
+    echo '  });' >> startup.js && \
+    echo '} else {' >> startup.js && \
+    echo '  console.warn("TypeORM config not found, skipping migrations");' >> startup.js && \
+    echo '  startApp();' >> startup.js && \
+    echo '}' >> startup.js
+
+# Set proper ownership
+RUN chown -R 65532:65532 /home/node/bff-service-backend
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD /usr/local/bin/node -e "const http = require('http'); http.get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => { process.exit(1); });"
+
+# Switch to non-root user
+USER 65532
+
+EXPOSE 3000
+EXPOSE 9000
+
+LABEL maintainer="progrc.com" \
+      org.opencontainers.image.title="ProGRC BFF Service" \
+      org.opencontainers.image.description="Backend For Frontend service for ProGRC platform"
+
+ENTRYPOINT ["/usr/local/bin/node", "startup.js"]

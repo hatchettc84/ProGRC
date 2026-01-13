@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: metabase-pvc
+  namespace: progrc-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metabase
+  namespace: progrc-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metabase
+  template:
+    metadata:
+      labels:
+        app: metabase
+    spec:
+      containers:
+      - name: metabase
+        image: metabase/metabase:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: MB_DB_TYPE
+          value: "h2"
+        - name: MB_DB_FILE
+          value: "/metabase-data/metabase.db"
+        - name: MB_SITE_NAME
+          value: "ProGRC Analytics"
+        - name: MB_SITE_LOCALE
+          value: "en"
+        - name: MB_ANONYMOUS_TRACKING_ENABLED
+          value: "false"
+        volumeMounts:
+        - name: metabase-data
+          mountPath: /metabase-data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: metabase-data
+        persistentVolumeClaim:
+          claimName: metabase-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metabase
+  namespace: progrc-dev
+spec:
+  selector:
+    app: metabase
+  ports:
+  - port: 3000
+    targetPort: 3000
+  type: ClusterIP
+
+
+

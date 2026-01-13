@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: progrc-ingress
+  namespace: progrc-dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+spec:
+  ingressClassName: nginx
+  rules:
+  # ✅ Allow access via IP address (143.244.221.38) or domain
+  # Empty host matches all hosts (IP or domain)
+  - host: ""  # Matches requests to IP address or any domain
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: progrc-backend
+            port:
+              number: 3000
+      - path: /analytics
+        pathType: Prefix
+        backend:
+          service:
+            name: metabase
+            port:
+              number: 3000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: progrc-frontend
+            port:
+              number: 8080
+
+

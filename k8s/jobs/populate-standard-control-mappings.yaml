@@ -1,0 +1,103 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: populate-standard-control-mappings
+  namespace: progrc-dev
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: populate-mappings
+        image: postgres:15-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          export PGPASSWORD="$POSTGRES_PASSWORD"
+          
+          echo "=== Populating standard_control_mapping ==="
+          
+          # Map all NIST 800-53 controls to all NIST 800-53 standards
+          echo "Mapping NIST 800-53 controls to standards 1,2,3,4,5,6,7,8,12,13..."
+          for standard_id in 1 2 3 4 5 6 7 8 12 13; do
+            echo "  Processing standard $standard_id..."
+            psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" <<'EOSQL'
+              INSERT INTO standard_control_mapping
+                  (standard_id, control_id, additional_selection_parameters, additional_guidance, created_at, updated_at)
+              SELECT $standard_id, c.id, NULL, NULL, NOW(), NOW()
+              FROM control c
+              WHERE c.framework_id = 2
+                AND c.active = true
+                AND NOT EXISTS (
+                    SELECT 1 
+                    FROM standard_control_mapping scm 
+                    WHERE scm.standard_id = $standard_id 
+                      AND scm.control_id = c.id
+                );
+          EOSQL
+          done
+          
+          # Map CMMC controls to CMMC standards
+          echo "Mapping CMMC controls to standards 9,10..."
+          for standard_id in 9 10; do
+            echo "  Processing standard $standard_id..."
+            psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" <<'EOSQL'
+              INSERT INTO standard_control_mapping
+                  (standard_id, control_id, additional_selection_parameters, additional_guidance, created_at, updated_at)
+              SELECT $standard_id, c.id, NULL, NULL, NOW(), NOW()
+              FROM control c
+              WHERE c.framework_id = 3
+                AND c.active = true
+                AND NOT EXISTS (
+                    SELECT 1 
+                    FROM standard_control_mapping scm 
+                    WHERE scm.standard_id = $standard_id 
+                      AND scm.control_id = c.id
+                );
+          EOSQL
+          done
+          
+          echo ""
+          echo "=== Verification ==="
+          psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" <<'EOSQL'
+            SELECT 
+              s.id as standard_id,
+              s.name as standard_name,
+              COUNT(scm.control_id) as control_count
+            FROM standard s
+            LEFT JOIN standard_control_mapping scm ON s.id = scm.standard_id
+            WHERE s.active = true
+            GROUP BY s.id, s.name
+            ORDER BY s.id;
+          EOSQL
+        envFrom:
+        - secretRef:
+            name: progrc-bff-db-credentials
+        env:
+        - name: POSTGRES_SSL
+          value: "true"
+        - name: PGSSLMODE
+          value: "require"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

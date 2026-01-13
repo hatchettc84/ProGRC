@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: update-org-details-permission
+  namespace: progrc-dev
+spec:
+  template:
+    spec:
+      containers:
+      - name: update-permission
+        image: postgres:15-alpine
+        env:
+        - name: PGHOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-dev-secrets
+              key: DB_HOST
+        - name: PGPORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-dev-secrets
+              key: DB_PORT
+        - name: PGDATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-dev-secrets
+              key: DB_NAME
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-dev-secrets
+              key: DB_USER
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-dev-secrets
+              key: DB_PASSWORD
+        command:
+        - /bin/sh
+        - -c
+        - |
+          psql -c "UPDATE permissions SET allowed_roles = '[1,2,3,4,5]'::jsonb WHERE api_path = '/api/v1/onboarding/organization/{id}/details' AND method = 'GET'::api_method;"
+          psql -c "SELECT api_path, method, allowed_roles FROM permissions WHERE api_path LIKE '%organization%details%';"
+      restartPolicy: Never
+  backoffLimit: 2
+
+
+

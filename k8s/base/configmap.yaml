@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: progrc-config
+  namespace: progrc-dev
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  API_PREFIX: "api"
+  CORS_ORIGIN: "*"
+  ENVIRONMENT: "production"
+  TENANT_MODE: "shared"
+  MAX_TENANTS_PER_INSTANCE: "1000"
+  TENANT_ISOLATION: "row_level_security"
+  # Database connection (managed database - values from secret)
+  # POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE come from progrc-bff-db-credentials secret
+  POSTGRES_SSL: "true"
+  # Redis connection
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  # LocalStack S3
+  USE_LOCALSTACK: "true"
+  LOCALSTACK_ENDPOINT: "http://localstack-internal:4566"
+  LOCALSTACK_PUBLIC_ENDPOINT: "http://143.244.221.38:4566"
+  AWS_S3_ENDPOINT: "http://localstack-internal:4566"
+  AWS_S3_REGION: "us-east-1"
+  AWS_S3_ACCESS_KEY_ID: "test"
+  AWS_S3_SECRET_ACCESS_KEY: "test"
+  S3_FILES_BUCKET: "progrc-app-file-uploads"
+  FRONTEND_S3_BUCKET: "progrc-app-frontend-dev"
+  # LLM Configuration - Ollama prioritized to eliminate API calls
+  # Using external AI Droplet (64.225.20.65) in same region (nyc3) for low latency
+  USE_OLLAMA: "true"
+  OLLAMA_BASE_URL: "http://64.225.20.65:11434"
+  OLLAMA_MODEL: "llama3.2:1b"
+  OLLAMA_EMBEDDING_MODEL: "nomic-embed-text"
+  # Cloud services disabled by default (set to "false" to force Ollama-only)
+  USE_GEMINI: "false"
+  GEMINI_MODEL: "gemini-2.0-flash-exp"
+  USE_GRADIENT: "false"
+  GRADIENT_API_URL: "https://lyfxj4kyx25h6oj3zymh656q.agents.do-ai.run"
+  GRADIENT_MODEL: "" # Agent endpoint has model pre-configured, model parameter not needed
+  # GRADIENT_API_KEY should be set in Kubernetes Secret (progrc-bff-secrets)
+  # Application settings
+  AWS_SQS_ENABLED: "false"
+  POPULATE_ASSET_DUMMY_DATA: "true"
+  RESET_PASSWORD_EXPIRY_TOKEN_HOUR: "24"
+  USER_INVITATION_EXPIRY_TOKEN_HOUR: "168"
+  IMPERSONATE_TIMEOUT_SECONDS: "14400"
+  # Permission Validation - ⚠️ TEMPORARILY DISABLED: Backend crashing, investigating
+  # TODO: Re-enable after fixing backend startup issues
+  ENABLE_PERMISSION_RESTRICTIONS: "false"
+  ALLOW_UNKNOWN_API_PATHS: "true"
+  ALLOW_EMPTY_PERMISSIONS: "true"
+

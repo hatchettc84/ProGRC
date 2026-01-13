@@ -1,0 +1,83 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fix-db-permissions
+  namespace: progrc-dev
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: psql
+        image: postgres:16-alpine
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Connecting to database to fix permissions..."
+          PGHOST=$(echo $POSTGRES_HOST | cut -d: -f1)
+          PGPORT=${POSTGRES_PORT:-5432}
+          
+          # Try to connect and grant permissions
+          # Note: This requires admin privileges on the database
+          psql "host=$PGHOST port=$PGPORT dbname=$POSTGRES_DATABASE user=$POSTGRES_USERNAME password=$POSTGRES_PASSWORD sslmode=require" << EOF
+          -- Grant schema permissions
+          GRANT ALL PRIVILEGES ON SCHEMA public TO $POSTGRES_USERNAME;
+          GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_DATABASE TO $POSTGRES_USERNAME;
+          
+          -- Grant default privileges for future objects
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $POSTGRES_USERNAME;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $POSTGRES_USERNAME;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO $POSTGRES_USERNAME;
+          
+          -- Grant on existing objects (if any)
+          GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $POSTGRES_USERNAME;
+          GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $POSTGRES_USERNAME;
+          GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO $POSTGRES_USERNAME;
+          
+          -- Verify permissions
+          SELECT 
+            nspname as schema_name,
+            has_schema_privilege('$POSTGRES_USERNAME', nspname, 'CREATE') as can_create,
+            has_schema_privilege('$POSTGRES_USERNAME', nspname, 'USAGE') as can_use
+          FROM pg_namespace 
+          WHERE nspname = 'public';
+          
+          \q
+          EOF
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Database permissions granted successfully!"
+          else
+            echo "⚠️  Note: If this failed, you may need admin database credentials."
+            echo "   See k8s/FIX_DATABASE_PERMISSIONS.md for manual steps."
+          fi
+        env:
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+
+
+

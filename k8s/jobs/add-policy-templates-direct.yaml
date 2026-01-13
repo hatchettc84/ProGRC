@@ -1,0 +1,164 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: add-policy-templates-direct
+  namespace: progrc-dev
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: registry-progrc
+      containers:
+      - name: migration
+        image: registry.digitalocean.com/progrc/progrc-backend:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Adding entity_type column and policy templates..."
+          node -e "
+          const {DataSource} = require('typeorm');
+          const config = require('./dist/config/typeorm.config.js');
+          const ds = new DataSource(config.dataSourceOptions);
+          
+          ds.initialize()
+            .then(async () => {
+              console.log('Connected to database');
+              
+              // Add entity_type column if it doesn't exist
+              const columnExists = await ds.query(\`
+                SELECT EXISTS (
+                  SELECT FROM information_schema.columns 
+                  WHERE table_name = 'templates' 
+                  AND column_name = 'entity_type'
+                )
+              \`);
+              
+              if (!columnExists[0].exists) {
+                console.log('Adding entity_type column...');
+                await ds.query(\`
+                  ALTER TABLE templates 
+                  ADD COLUMN entity_type VARCHAR(255) DEFAULT 'assessment'
+                \`);
+                console.log('entity_type column added');
+              } else {
+                console.log('entity_type column already exists');
+              }
+              
+              // Get license type and user
+              const licenseType = await ds.query('SELECT id FROM license_type LIMIT 1');
+              const licenseTypeId = licenseType[0]?.id || 1;
+              
+              const user = await ds.query('SELECT id FROM users WHERE role_id = 1 LIMIT 1');
+              const userId = user[0]?.id || '00000000-0000-0000-0000-000000000000';
+              
+              // Copy policy templates
+              console.log('Copying policy templates...');
+              const result = await ds.query(\`
+                INSERT INTO templates (
+                  name, entity_type, license_type_id, is_published, is_editable,
+                  is_default, is_available, llm_enabled, type, standard_ids,
+                  customer_ids, created_by, updated_by, upload_date, update_date, outline
+                )
+                SELECT 
+                  pt.name, 'policy', \$1, true, true,
+                  false, true, false, 'word', '{}'::int[],
+                  '{}'::varchar[], \$2::uuid, \$2::uuid,
+                  COALESCE(pt.created_at, NOW()), COALESCE(pt.updated_at, NOW()),
+                  '{}'::json
+                FROM policy_template pt
+                WHERE NOT EXISTS (
+                  SELECT 1 FROM templates t 
+                  WHERE t.name = pt.name AND t.entity_type = 'policy'
+                )
+                RETURNING id, name
+              \`, [licenseTypeId, userId]);
+              
+              console.log('Inserted', result.length, 'policy templates');
+              
+              // Create template sections
+              for (const template of result) {
+                const policyTemplate = await ds.query(
+                  'SELECT content FROM policy_template WHERE name = \$1',
+                  [template.name]
+                );
+                
+                if (policyTemplate[0]?.content?.htmlContent) {
+                  await ds.query(\`
+                    INSERT INTO templates_section (
+                      template_id, title, section_id, html_content, is_active,
+                      type, parent_id, is_looped, created_by, updated_by, created_at, updated_at
+                    )
+                    SELECT 
+                      \$1, \$2, gen_random_uuid()::varchar, \$3,
+                      true, 'GLOBAL', NULL, false, \$4::uuid, \$4::uuid,
+                      NOW(), NOW()
+                    WHERE NOT EXISTS (
+                      SELECT 1 FROM templates_section ts WHERE ts.template_id = \$1
+                    )
+                  \`, [template.id, template.name, policyTemplate[0].content.htmlContent, userId]);
+                  console.log('Created section for', template.name);
+                }
+              }
+              
+              console.log('✅ Policy templates migration completed successfully!');
+              process.exit(0);
+            })
+            .catch(e => {
+              console.error('ERROR:', e.message);
+              console.error(e.stack);
+              process.exit(1);
+            });
+          "
+        envFrom:
+        - configMapRef:
+            name: progrc-config
+        - secretRef:
+            name: progrc-bff-dev-secrets
+        env:
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+        - name: POSTGRES_SSL
+          value: "true"
+
+
+

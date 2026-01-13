@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend Test</title>
+</head>
+<body>
+    <h1>Frontend Loading Test</h1>
+    <div id="status">Checking...</div>
+    <script>
+        const status = document.getElementById('status');
+        
+        // Test 1: Check if main JS loads
+        fetch('/assets/index-B2PhZfDs.js')
+            .then(r => {
+                if (r.ok) {
+                    status.innerHTML += '<br>✓ Main JS file accessible';
+                } else {
+                    status.innerHTML += '<br>✗ Main JS file failed: ' + r.status;
+                }
+            })
+            .catch(e => {
+                status.innerHTML += '<br>✗ Main JS file error: ' + e.message;
+            });
+        
+        // Test 2: Check if CSS loads
+        fetch('/assets/index-DLP5HTUs.css')
+            .then(r => {
+                if (r.ok) {
+                    status.innerHTML += '<br>✓ CSS file accessible';
+                } else {
+                    status.innerHTML += '<br>✗ CSS file failed: ' + r.status;
+                }
+            })
+            .catch(e => {
+                status.innerHTML += '<br>✗ CSS file error: ' + e.message;
+            });
+        
+        // Test 3: Check API
+        fetch('/api/v1/jwt-auth/me')
+            .then(r => {
+                status.innerHTML += '<br>✓ API accessible (status: ' + r.status + ')';
+            })
+            .catch(e => {
+                status.innerHTML += '<br>✗ API error: ' + e.message;
+            });
+        
+        // Test 4: Check if root element exists
+        setTimeout(() => {
+            const root = document.getElementById('root');
+            if (root) {
+                status.innerHTML += '<br>✓ Root element exists';
+            } else {
+                status.innerHTML += '<br>✗ Root element missing';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
+

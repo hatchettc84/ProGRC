@@ -1,0 +1,58 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+We have an existing NestJS project, and we need to integrate JIRA using the OAuth 2.0 (3LO) strategy. The integration should allow customers with JIRA admin privileges to connect their JIRA accounts to our application. The connection will later be used for creating boards, stories, tasks, and managing issue statuses for compliance recommendations.
+
+### Requirements:
+
+1. **JIRA Module (jira.module.ts)**
+   - Create a dedicated module named `JiraModule` that encapsulates all JIRA integration functionality.
+   - Ensure this module exports its controller and service if needed.
+
+2. **JIRA Controller (jira.controller.ts)**
+   - Inside the JiraModule, create a controller with endpoints:
+     - `GET /jira/connect`: Redirects the user to the JIRA OAuth authorization URL.
+     - `GET /jira/callback`: Handles the OAuth callback, exchanges the authorization code for tokens, and (optionally) verifies that the account has JIRA admin privileges.
+   - Include error handling for missing or invalid parameters.
+
+3. **JIRA Service (jira.service.ts)**
+   - Inside the JiraModule, create a service that includes:
+     - A method `getAuthorizationUrl()` to construct the OAuth URL with scopes including admin privileges (e.g., `manage:jira-administration`).
+     - A method `handleOAuthCallback(code: string, applicationId: number, sourceType: number)` to exchange the code for access and refresh tokens using the Atlassian OAuth endpoint.
+     - After obtaining tokens, store them in the `metadata` column of the existing `ApplicationConnection` entity with the following structure:
+       ```json
+       {
+         "provider": "Jira",
+         "connection_type": "oauth",
+         "access_token": "<access_token>",
+         "refresh_token": "<refresh_token>",
+         "api_key": "<optional_api_key>"
+       }
+       ```
+     - (Optional) A method to verify that the connected account has JIRA admin privileges by making a sample API call.
+   - Use environment variables to load sensitive configuration (JIRA client ID, client secret, callback URL, and JIRA base URL).
+
+4. **Utilizing Existing ApplicationConnection Entity**
+   - Instead of creating a new entity, use the existing `ApplicationConnection` entity for storing JIRA connection details.
+   - Inject a repository for `ApplicationConnection` into the `JiraService` to perform create/update operations.
+   - When a user connects JIRA, create or update the corresponding `ApplicationConnection` entry based on `application_id` and `source_type`.
+
+5. **Environment Configuration**
+   - Add or update environment variable usage (e.g., in `.env` or configuration files) to include:
+     - `JIRA_CLIENT_ID`
+     - `JIRA_CLIENT_SECRET`
+     - `JIRA_CALLBACK_URL`
+     - `JIRA_BASE_URL` (if needed)
+
+6. **Attaching the JIRA Module to the App Module**
+   - Update the main `AppModule` (or your public module) to import the `JiraModule` so that the JIRA integration endpoints are available in the application.
+
+### Integration Considerations:
+- Ensure the generated code follows NestJS best practices and is modular.
+- Provide comments in the code to explain each major section and the logic flow.
+- Include proper error handling, logging, and modular design for maintainability.
+- The code should be structured so that only users with JIRA admin privileges can complete the connection process.
+- Ensure that when a user reconnects, the existing `ApplicationConnection` record is updated instead of creating duplicates.
+- Use the global project-context-rules.mdc to write the code. And follow instructions.

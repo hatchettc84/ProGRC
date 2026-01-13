@@ -1,0 +1,178 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: add-upload-permissions
+  namespace: progrc-dev
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: registry-progrc
+      containers:
+      - name: migration
+        image: registry.digitalocean.com/progrc/progrc-backend:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "Adding upload and connections permissions..."
+          node -e "
+          const {DataSource} = require('typeorm');
+          const config = require('./dist/config/typeorm.config.js');
+          const ds = new DataSource(config.dataSourceOptions);
+          
+          ds.initialize()
+            .then(async () => {
+              console.log('Connected to database');
+              
+              // Add permission for POST /api/v1/connections
+              await ds.query(\`
+                INSERT INTO permissions (api_path, method, allowed_roles, allowed_licenses, allow_all, created_at, updated_at)
+                VALUES (
+                  '/api/v1/connections',
+                  'POST'::api_method,
+                  '[3,4]'::jsonb,
+                  '[]'::jsonb,
+                  false,
+                  NOW(),
+                  NOW()
+                )
+                ON CONFLICT (api_path, method) DO UPDATE
+                SET allowed_roles = '[3,4]'::jsonb,
+                    updated_at = NOW();
+              \`);
+              console.log('✅ Added POST /api/v1/connections permission');
+              
+              // Add permission for GET /api/v1/connections
+              await ds.query(\`
+                INSERT INTO permissions (api_path, method, allowed_roles, allowed_licenses, allow_all, created_at, updated_at)
+                VALUES (
+                  '/api/v1/connections',
+                  'GET'::api_method,
+                  '[3,4,7]'::jsonb,
+                  '[]'::jsonb,
+                  false,
+                  NOW(),
+                  NOW()
+                )
+                ON CONFLICT (api_path, method) DO UPDATE
+                SET allowed_roles = '[3,4,7]'::jsonb,
+                    updated_at = NOW();
+              \`);
+              console.log('✅ Added GET /api/v1/connections permission');
+              
+              // Add permission for PATCH /api/v1/connections/{id}
+              await ds.query(\`
+                INSERT INTO permissions (api_path, method, allowed_roles, allowed_licenses, allow_all, created_at, updated_at)
+                VALUES (
+                  '/api/v1/connections/{id}',
+                  'PATCH'::api_method,
+                  '[3,4]'::jsonb,
+                  '[]'::jsonb,
+                  false,
+                  NOW(),
+                  NOW()
+                )
+                ON CONFLICT (api_path, method) DO UPDATE
+                SET allowed_roles = '[3,4]'::jsonb,
+                    updated_at = NOW();
+              \`);
+              console.log('✅ Added PATCH /api/v1/connections/{id} permission');
+              
+              // Add permission for DELETE /api/v1/connections/{id}
+              await ds.query(\`
+                INSERT INTO permissions (api_path, method, allowed_roles, allowed_licenses, allow_all, created_at, updated_at)
+                VALUES (
+                  '/api/v1/connections/{id}',
+                  'DELETE'::api_method,
+                  '[3,4]'::jsonb,
+                  '[]'::jsonb,
+                  false,
+                  NOW(),
+                  NOW()
+                )
+                ON CONFLICT (api_path, method) DO UPDATE
+                SET allowed_roles = '[3,4]'::jsonb,
+                    updated_at = NOW();
+              \`);
+              console.log('✅ Added DELETE /api/v1/connections/{id} permission');
+              
+              // Add permission for POST /api/v1/app/uploads/generate-presigned-url
+              await ds.query(\`
+                INSERT INTO permissions (api_path, method, allowed_roles, allowed_licenses, allow_all, created_at, updated_at)
+                VALUES (
+                  '/api/v1/app/uploads/generate-presigned-url',
+                  'POST'::api_method,
+                  '[3,4,5]'::jsonb,
+                  '[]'::jsonb,
+                  false,
+                  NOW(),
+                  NOW()
+                )
+                ON CONFLICT (api_path, method) DO UPDATE
+                SET allowed_roles = '[3,4,5]'::jsonb,
+                    updated_at = NOW();
+              \`);
+              console.log('✅ Added POST /api/v1/app/uploads/generate-presigned-url permission');
+              
+              console.log('✅ All permissions added successfully!');
+              process.exit(0);
+            })
+            .catch(e => {
+              console.error('ERROR:', e.message);
+              console.error(e.stack);
+              process.exit(1);
+            });
+          "
+        envFrom:
+        - configMapRef:
+            name: progrc-config
+        - secretRef:
+            name: progrc-bff-dev-secrets
+        env:
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+        - name: POSTGRES_SSL
+          value: "true"
+
+
+

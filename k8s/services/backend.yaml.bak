@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: progrc-backend
+  namespace: progrc-dev
+spec:
+  replicas: 3  # ✅ FIXED: Match HPA minReplicas for high availability
+  selector:
+    matchLabels:
+      app: progrc-backend
+  template:
+    metadata:
+      labels:
+        app: progrc-backend
+    spec:
+      # Security: Run as non-root user (matches Dockerfile USER 65532)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: registry-progrc
+      serviceAccountName: progrc-backend-sa
+      containers:
+      - name: app
+        image: registry.digitalocean.com/progrc/progrc-backend:latest
+        imagePullPolicy: Always
+        # Security: Container security context (matches Dockerfile USER 65532)
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # App needs to write logs and temp files
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 65532
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: progrc-config
+        - secretRef:
+            name: progrc-bff-dev-secrets
+        env:
+        - name: POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: password
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: port
+        - name: POSTGRES_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: progrc-bff-db-credentials
+              key: database
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 3000
+          initialDelaySeconds: 120  # ✅ Increased: Allow more time for migrations
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5  # ✅ Increased: More failures before restart
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 3000
+          initialDelaySeconds: 90  # ✅ Increased: Allow more time for migrations
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 5  # ✅ Increased: More failures before marking not ready
+      initContainers:
+      - name: wait-for-redis
+        image: redis:7-alpine
+        # Security: Init container security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 999  # Redis user
+        # ✅ FIX: Resource limits required by quota
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        command:
+        - sh
+        - -c
+        - |
+          until redis-cli -h redis ping; do
+            echo "Waiting for redis..."
+            sleep 2
+          done
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: progrc-backend
+  namespace: progrc-dev
+spec:
+  selector:
+    app: progrc-backend
+  ports:
+  - port: 3000
+    targetPort: 3000
+  type: ClusterIP  # ✅ FIXED: Use Ingress instead of separate LoadBalancer (saves ~$24/month)
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: progrc-backend-hpa
+  namespace: progrc-dev
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: progrc-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+

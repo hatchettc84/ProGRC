@@ -1,0 +1,89 @@
+node_modules
+dist
+*.log
+logs
+logs_bff
+**/node_modules/**/test/
+**/node_modules/**/tests/
+**/node_modules/**/__tests__/
+**/node_modules/**/fixtures/
+
+
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+test
+tests
+__tests__
+*.test.js
+*.spec.js
+e2e
+
+# Build files
+dist
+build
+.next
+out
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+docs
+*.md
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+jenkins
+
+# Development files
+.eslintrc*
+.prettierrc*
+.editorconfig
+webpack.config.js
+
+# Temporary files
+tmp
+temp
+*.tmp
+*.log
+
+# Security scan reports
+*-report.json
+*-report.txt
+anchore_*
+trivy_*
+clamav_*

@@ -1,0 +1,21 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: progrc-backend-pdb
+  namespace: progrc-dev
+spec:
+  minAvailable: 2  # Always keep at least 2 pods running during disruptions
+  selector:
+    matchLabels:
+      app: progrc-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: progrc-frontend-pdb
+  namespace: progrc-dev
+spec:
+  minAvailable: 1  # Keep at least 1 frontend pod running
+  selector:
+    matchLabels:
+      app: progrc-frontend

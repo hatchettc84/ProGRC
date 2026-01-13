@@ -1,0 +1,227 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: bff-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: progrc_bff
+      POSTGRES_USER: progrc
+      POSTGRES_PASSWORD: progrc_dev_password_change_me
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U progrc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bff-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: bff-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - bff-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    container_name: bff-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+
+      # Database
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USERNAME: progrc
+      POSTGRES_PASSWORD: progrc_dev_password_change_me
+      POSTGRES_DATABASE: progrc_bff
+      POSTGRES_SSL: "false"
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # JWT Keys (RS256) - Generated for this deployment
+      ACCESS_TOKEN_SIGNATURE_PRIVATE: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcFFJQkFBS0NBUUVBNmxNM1hPY1N5OUZ3NHozYUFjcW5aaWdTQkZQS240WTkwVGdlbE0vbXlqdjFlOGNIClhxN095YWdZbzBLcUs2b243VTV5eUNSeUUwRUNpZ0RRamVDWEZYWDFQNzMvRGUxRXE3Q0RxUSs4SWN1bjk1RkQKaDJkVUVJb2JqWWlUOHdBbHlrM0Jqa21PY1Z2eUZYVXNCRm9CTEV0VWVLQWZsYkl1OXhjSG1ZOE1MUFNlWGR3Uwo2OWhoTEFIL2tnTnZaK1AraHRGSmdXNERMM2pEaGRTdUZObUlFYUxickZneUFsTnBITVI0ejVlU01BdzdvSnlPCnUyWExVbmtSVlIyMVM4NjVzTStmNDB6OHd2Y2tPbVBzcDdSYmR5cUdjR0R5MURzdmlDOWZlMUdtZ1JHQjVKT1YKRTZWSitNcFNkQjhDaGtHdTZscC9WUjZOcWlhYVk1b2tmNmdabHdJREFRQUJBb0lCQVFEYVcyZVk1QitvM09nVQphbHZRRlplKzQ1SStoQktxYXo4Snl3RDhiV3hFZ25FMHdmaEZMQ0s0MmpMeldEa1piWHU5Y01BWGI1YjZDRGVrCmdEUFlNalM0SSs3QlVuenQ3bTl5aW85MktKcUk1NjREVGxPZVJ4U1lRUXFCN29ib0IvZ3ZPQndwU3JRNVFKUXIKbUwvRzRsUjdnVXNiQ1NQRnJJQ0ZjdWw3R0VraFRaNFQ0Z0RENXhzZGZCSld3ODA3a2l6aStRTmdFcnlsRWRGbQpvdStBVkY5UVJ4V3hnU21aQWdmL1JMU3pETGZoUVI4Znc0bU51dXBJL0pwdUpDQ1Vtb3RzVkR4NFNmQVFzMEhXCldJOGU0azcyWHZDZVVoMTlpc0ZJQzJFWSsvTnRxT3BlOElwaXZ1OWsxcFF5dUFnREl0M1hwYUEzdE5ZWnllNWQKRGljZlhuaEJBb0dCQVBkRXRYQ2JaTjhSYWRwampic05pUkZZbDhBeFdWNXVmVldoSU96RmxCRHg0aDlIa1BCVQpGZUxjdFRrTTkxMTQ2QW1UMmc1dWFRaktmSERCNGIxcHYxajZpQjlOYnc3NE91dTNYNjQ0VnVrYW9mOW9qNUxPCncxaEcvc2g2WWFyeDF3ZHlSVnErRi9Vc05tQ29lTW1jeVA4UExxUWNKRWVZY0RhdmRDUFlVck9oQW9HQkFQS1oKZ0NiOW03M1BYTTk1eTRRR0RTUUh1MEtHV2hseFplaVI1amhhU0twS2gybWZqcFVhRFVmTm1CdlE5TG53emVyYwpPbURPYWFhOFNmWDJ5dGdlVHhPdi9TQ1U1cXorOXRoNVljN2I0S0I3UUdUdjY5bi9QTzhCcDgwU25UNEtINWlNCmVjSS8wT2MxWkE2SGdvdnlqMUt1a1hJNlpPMTBpUFk2eDZYTEZFSTNBb0dCQVBWdFhFNFYzeXhONDJ3aHJqYkEKZTVFZEJ4cDdvUUhLMTFwYjRRdENIUElvczlGcVBtRmNoSkMxa3FhNnlQZ2RIdXNLdHIvbU5SakZxbmhjNkl3UgozeHdaSjIweWRZNDlNblp1ZjJpMGdRZEVLUkVTbnBjUDVQTEZIUFN1REMwWmQ5M3JQUTJSYXNRdUN4Y3JnU0JVCkgyaVNrQy9Sd3V6UlVHZm5CSGJqcTBxaEFvR0FjRkZOR2NBMHlNNG1oQkE1ZnlobUVSWmJSbE41aDJvTzZud1MKQUdrY1Yyc21BbXJTMG9rN09ORWc2VS8yM2RkMUhwVlRtZG8yNC9Fc3RPbkx3LzlVVVNNYnFHZ0gzSFEyeU1aNQoyQkhJajhSQWJmcitVUEZ3dnA4Zmx6eFUvSkluU3JOTzgvWWp1OGZtU1N2SDd3OGYrQUhHYVFKTUUvdnVKVUhWCmlSYmFqRVVDZ1lFQTEzaVZQYng1UHdySEkyelBMYm5xanBveE5jeGFTaGxiNFVFVnBINkdVVHpmYUo1bWVITVMKL3hvUlliY3ZNUjNBTTg2dlhEOHFoRzVzZThQUFhSSVNtcU5rT3Z1bldZSXVBdUg1OWpUaGdjeXNVdUVXMzRWeQpPOVk3YnY2UWFCZ05aTUMyOVlPc2QwZjIrMVhWY1lSSXVHNzZGcWMvUFlCUXZqczQ5SkxtZ2Q4PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+      ACCESS_TOKEN_SIGNATURE_PUBLIC: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUE2bE0zWE9jU3k5Rnc0ejNhQWNxbgpaaWdTQkZQS240WTkwVGdlbE0vbXlqdjFlOGNIWHE3T3lhZ1lvMEtxSzZvbjdVNXl5Q1J5RTBFQ2lnRFFqZUNYCkZYWDFQNzMvRGUxRXE3Q0RxUSs4SWN1bjk1RkRoMmRVRUlvYmpZaVQ4d0FseWszQmprbU9jVnZ5RlhVc0JGb0IKTEV0VWVLQWZsYkl1OXhjSG1ZOE1MUFNlWGR3UzY5aGhMQUgva2dOdlorUCtodEZKZ1c0REwzakRoZFN1Rk5tSQpFYUxickZneUFsTnBITVI0ejVlU01BdzdvSnlPdTJYTFVua1JWUjIxUzg2NXNNK2Y0MHo4d3Zja09tUHNwN1JiCmR5cUdjR0R5MURzdmlDOWZlMUdtZ1JHQjVKT1ZFNlZKK01wU2RCOENoa0d1NmxwL1ZSNk5xaWFhWTVva2Y2Z1oKbHdJREFRQUIKLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg==
+      REFRESH_TOKEN_SIGNATURE: 58aa8387a06e94abbe1cf365402f10f5893237906e8d3bfb08a774ea52cf4e1f
+
+      # JWT Module Config (also needed)
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      JWT_EXPIRES_IN: 7d
+
+      # Application
+      API_PREFIX: api
+      CORS_ORIGIN: "*"
+      AWS_SQS_ENABLED: 'false'
+      ENVIRONMENT: dev
+      POPULATE_ASSET_DUMMY_DATA: "true"
+
+      # Token expiry hours
+      RESET_PASSWORD_EXPIRY_TOKEN_HOUR: 24
+      USER_INVITATION_EXPIRY_TOKEN_HOUR: 168
+
+      # Frontend URLs
+      FE_HOST: https://localhost:3000
+      USER_INVITATION_URL: /reset-password
+
+      # Impersonation timeout (in seconds)
+      IMPERSONATE_TIMEOUT_SECONDS: 14400
+
+      # LLM Configuration - Priority: Gemini > OpenAI > Ollama
+      
+      # Gemini Configuration (highest priority)
+      USE_GEMINI: ${USE_GEMINI:-true}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyBbXF6oj-tnf9ofUy1u6Hex2i-Fr5xC69o}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash-exp}
+      
+      # OpenAI Configuration (fallback if Gemini not available)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      
+      # Ollama Configuration (fallback if neither Gemini nor OpenAI available)
+      USE_OLLAMA: ${USE_OLLAMA:-true}
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:1b}
+
+      # AWS S3 Configuration (using LocalStack for local storage)
+      USE_LOCALSTACK: "true"
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      LOCALSTACK_PUBLIC_ENDPOINT: http://168.231.70.205:4566
+      AWS_S3_ENDPOINT: http://localstack:4566
+      AWS_S3_REGION: us-east-1
+      AWS_S3_ACCESS_KEY_ID: test
+      AWS_S3_SECRET_ACCESS_KEY: test
+      S3_FILES_BUCKET: progrc-app-file-uploads
+      FRONTEND_S3_BUCKET: progrc-app-frontend-dev
+
+    ports:
+      - "3001:3000"
+      - "9002:9000"
+    volumes:
+      - app_logs:/logs_bff
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - bff-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http = require('http'); http.get('http://localhost:3000/api/v1/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => { process.exit(1); });"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: bff-localstack
+    restart: unless-stopped
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3
+      DEBUG: "0"
+      DATA_DIR: /tmp/localstack/data
+      PERSISTENCE: "1"
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DISABLE_CORS_CHECKS: "1"
+      DISABLE_CUSTOM_CORS_S3: "1"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh:ro
+    networks:
+      - bff-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4566/_localstack/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: bff-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11435:11434"  # Use different host port to avoid conflicts
+    networks:
+      - bff-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: bff-metabase
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      # Metabase application database (uses H2 embedded by default)
+      MB_DB_TYPE: h2
+      MB_DB_FILE: /metabase-data/metabase.db
+      
+      # Application settings
+      MB_SITE_NAME: "ProGRC Analytics"
+      MB_SITE_LOCALE: en
+      MB_ANONYMOUS_TRACKING_ENABLED: "false"
+      
+      # Connection to ProGRC PostgreSQL database will be configured via UI
+      # These are just defaults - users will add the connection in Metabase UI
+      MB_DB_TYPE_PROGRC: postgres
+    volumes:
+      - metabase_data:/metabase-data
+    networks:
+      - bff-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+networks:
+  bff-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_logs:
+    driver: local
+  metabase_data:
+    driver: local
+  localstack_data:
+    driver: local
+  ollama_data:
+    driver: local

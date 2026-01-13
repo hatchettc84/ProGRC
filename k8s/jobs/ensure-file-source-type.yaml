@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ensure-file-source-type
+  namespace: progrc-dev
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+      - name: registry-progrc
+      containers:
+      - name: fix-db
+        image: postgres:15-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 65532
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          export PGPASSWORD="$POSTGRES_PASSWORD"
+          echo "Checking for FILE SourceType..."
+          psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" <<EOF
+          SELECT id, name FROM source_types WHERE name = 'FILE';
+          EOF
+          echo ""
+          echo "Inserting FILE SourceType if it doesn't exist..."
+          psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" <<EOF
+          INSERT INTO source_types (name, created_at, updated_at, template_schema, source_count, assets_count) 
+          SELECT 'FILE', NOW(), NOW(), NULL, NULL, NULL 
+          WHERE NOT EXISTS (SELECT 1 FROM source_types WHERE name = 'FILE');
+          EOF
+          echo ""
+          echo "Verifying FILE SourceType..."
+          psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" <<EOF
+          SELECT id, name FROM source_types WHERE name = 'FILE';
+          EOF
+        envFrom:
+        - secretRef:
+            name: progrc-bff-db-credentials
+        env:
+        - name: POSTGRES_SSL
+          value: "true"
+        - name: PGSSLMODE
+          value: "require"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+
