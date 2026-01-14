@@ -1,0 +1,25 @@
+# Quick Copy-Paste Commands for VPS Deployment
+
+# Step 1: Navigate to project
+cd /opt/progrc/bff-service-backend-dev
+
+# Step 2: Build and deploy (automated)
+chmod +x deploy-vps-services.sh
+./deploy-vps-services.sh
+
+# OR Manual deployment:
+# docker-compose build --no-cache
+# docker-compose up -d
+# docker-compose ps
+
+# Step 3: Pull Ollama models
+chmod +x pull-ollama-models.sh
+./pull-ollama-models.sh
+
+# Step 4: Run migrations
+chmod +x run-migrations.sh
+./run-migrations.sh
+
+# Step 5: Verify deployment
+chmod +x verify-deployment.sh
+./verify-deployment.sh
