@@ -1,0 +1,15 @@
+# Quick Copy-Paste Commands for VPS Configuration
+
+# Step 1: Navigate to project
+cd /opt/progrc/bff-service-backend-dev
+
+# Step 2: Pull latest changes
+git pull origin main
+
+# Step 3: Run configuration script
+chmod +x configure-vps-env.sh
+./configure-vps-env.sh
+
+# Step 4: Verify configuration
+ls -la .env
+cat .env | grep -E "(OLLAMA|POSTGRES|REDIS|LOCALSTACK)"
